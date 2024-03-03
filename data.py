@@ -15,16 +15,23 @@ class CIFARDataModule(L.LightningDataModule):
         self.opt = opt
         
         self.train_transform = v2.Compose(
-            v2.RandomRotation(90),
-            v2.RandomHorizontalFlip(p=0.7),
-            v2.RandomVerticalFlip(p=0.7),
-            v2.ToDtype(torch.float32, scale=True),
-            v2.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.247, 0.243, 0.261])
+            [
+                v2.RandomRotation(90),
+                v2.RandomHorizontalFlip(p=0.7),
+                v2.RandomVerticalFlip(p=0.7),
+                v2.ToImage(),
+                v2.ToDtype(torch.float32, scale=True),
+                v2.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.247, 0.243, 0.261])
+            ]
         )
 
         self.val_transform = v2.Compose(
-            v2.ToDtype(torch.float32, scale=True),
-            v2.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.247, 0.243, 0.261])
+            [
+                v2.ToImage(),
+                v2.ToDtype(torch.float32, scale=True),
+                v2.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.247, 0.243, 0.261])
+            ]
+            
         )
         
     def setup(self, stage: str) -> None:
@@ -52,9 +59,9 @@ class CIFARDataModule(L.LightningDataModule):
     def val_dataloader(self) -> EVAL_DATALOADERS:
         return DataLoader(
             dataset=self.val_dataset,
-            batch_size=self.opt.val_batch_size,
+            batch_size=1.5 * self.opt.batch_size,
             shuffle=False,
-            num_workers=self.opt.val_workers,
+            num_workers=self.opt.workers,
             persistent_workers=True,
             pin_memory=True
         )
