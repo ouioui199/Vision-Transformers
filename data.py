@@ -65,3 +65,17 @@ class CIFARDataModule(L.LightningDataModule):
             persistent_workers=True,
             pin_memory=True
         )
+
+
+def im_to_patch(im, patch_size, flatten_channels: bool = True):
+    B, C, H, W = im.shape
+    assert H // patch_size == 0 and W // patch_size == 0, f"Image height and width are {H, W}, which is not a multiple of the patch size"
+    
+    im = im.reshape(B, C, H // patch_size, patch_size, W // patch_size, patch_size)
+    im = im.permute(0, 2, 4, 1, 3, 5)
+    im = im.flatten(1, 2)
+    
+    if flatten_channels:
+        return im.flatten(2, 4)
+    else:
+        return im
