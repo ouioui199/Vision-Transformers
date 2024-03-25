@@ -38,7 +38,7 @@ class CIFARDataModule(L.LightningDataModule):
             [
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomResizedCrop((32, 32), scale=(0.8, 1.0), ratio=(0.9, 1.1)),
-                transforms.Resize(224, interpolation=InterpolationMode.BICUBIC),
+                # transforms.Resize(224, interpolation=InterpolationMode.BICUBIC),
                 transforms.ToTensor(),
                 transforms.Normalize([0.49139968, 0.48215841, 0.44653091], [0.24703223, 0.24348513, 0.26158784]),
             ]
@@ -46,7 +46,7 @@ class CIFARDataModule(L.LightningDataModule):
 
         self.val_transform = transforms.Compose(
             [
-                transforms.Resize(224, interpolation=InterpolationMode.BICUBIC),
+                # transforms.Resize(224, interpolation=InterpolationMode.BICUBIC),
                 transforms.ToTensor(),
                 transforms.Normalize([0.49139968, 0.48215841, 0.44653091], [0.24703223, 0.24348513, 0.26158784]),
             ]
@@ -87,7 +87,7 @@ class CIFARDataModule(L.LightningDataModule):
 
 def im_to_patch(im, patch_size, flatten_channels: bool = True):
     B, C, H, W = im.shape
-    assert H // patch_size == 0 and W // patch_size == 0, f"Image height and width are {H, W}, which is not a multiple of the patch size"
+    assert H // patch_size != 0 and W // patch_size != 0, f"Image height and width are {H, W}, which is not a multiple of the patch size"
     
     im = im.reshape(B, C, H // patch_size, patch_size, W // patch_size, patch_size)
     im = im.permute(0, 2, 4, 1, 3, 5)
