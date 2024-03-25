@@ -30,8 +30,8 @@ class AttentionBlock(nn.Module):
         
     def forward(self, x: Tensor) -> Tensor:
         inp_x = self.layer_norm(x)
-        x += self.attn(inp_x, inp_x, inp_x)[0]
-        x += self.linear(self.layer_norm(x))
+        x = x + self.attn(inp_x, inp_x, inp_x)[0]
+        x = x + self.linear(self.layer_norm(x))
         
         return x
     
@@ -55,10 +55,11 @@ class VisionTranformer(nn.Module):
         self.patch_size = patch_size
         
         self.input_layer = nn.Linear(num_channels * (patch_size ** 2), embed_dim)
-        self.tranformer = nn.Sequential(
+        self.transformer = nn.Sequential(
             *(AttentionBlock(
                 embed_dim,
-                hidden_dim, num_heads,
+                hidden_dim, 
+                num_heads,
                 dropout=dropout
             ) for _ in range(num_layers))
         )
@@ -78,7 +79,7 @@ class VisionTranformer(nn.Module):
         
         cls_token = self.cls_token.repeat(B, 1, 1)
         x = torch.cat([cls_token, x], dim=1)
-        x += self.pos_embedding[:, :T+1]
+        x = x + self.pos_embedding[:, :T+1]
         
         x = self.dropout(x)
         x = x.transpose(0, 1)
