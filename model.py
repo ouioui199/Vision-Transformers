@@ -2,7 +2,7 @@ from argparse import Namespace
 from typing import Dict, Union, Tuple, Optional
 import lightning as L
 
-import torch
+import torch, timm
 from torch import nn
 from torch import Tensor
 from torch.nn import CrossEntropyLoss
@@ -89,7 +89,7 @@ class VisionTranformer(nn.Module):
         return self.mlp_head(cls)
         
         
-class ViT(L.LightningModule):
+class BaseViT(L.LightningModule):
     def __init__(self, opt: Namespace, model_kwargs: Optional[Dict]) -> None:
         super().__init__()
         
@@ -192,3 +192,21 @@ class ViT(L.LightningModule):
         
         self.log('val_loss', mean_loss_value)
         self.log('val_Accuracy', mean_metrics_value)
+        
+        
+class ViT(BaseViT):
+    
+    def __init__(self, opt: Namespace, model_kwargs: Optional[Dict]) -> None:
+        super().__init__(opt, model_kwargs)
+        
+        self.model = timm.create_model(
+            # 'vit_base_patch16_224.augreg2_in21k_ft_in1k', 
+            'vit_tiny_patch16_224.augreg_in21k_ft_in1k',
+            # pretrained=True,
+            in_chans=self.opt.in_channels,
+            img_size=self.opt.model_input_size,
+            num_classes=10
+        )
+        
+    def forward(self, x):
+        return self.model(x)
