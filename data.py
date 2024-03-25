@@ -6,7 +6,8 @@ import lightning as L
 
 from torch.utils.data import DataLoader
 from torchvision.datasets import CIFAR10
-from torchvision.transforms import v2
+from torchvision.transforms import v2, InterpolationMode
+from torchvision import transforms
 
 
 class CIFARDataModule(L.LightningDataModule):
@@ -14,24 +15,41 @@ class CIFARDataModule(L.LightningDataModule):
         super().__init__()
         self.opt = opt
         
-        self.train_transform = v2.Compose(
+        # self.train_transform = v2.Compose(
+        #     [
+        #         v2.RandomRotation(90),
+        #         v2.RandomHorizontalFlip(p=0.7),
+        #         v2.RandomVerticalFlip(p=0.7),
+        #         v2.ToImage(),
+        #         v2.ToDtype(torch.float32, scale=True),
+        #         v2.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.247, 0.243, 0.261])
+        #     ]
+        # )
+
+        # self.val_transform = v2.Compose(
+        #     [
+        #         v2.ToImage(),
+        #         v2.ToDtype(torch.float32, scale=True),
+        #         v2.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.247, 0.243, 0.261])
+        #     ]
+        # )
+        
+        self.train_transform = transforms.Compose(
             [
-                v2.RandomRotation(90),
-                v2.RandomHorizontalFlip(p=0.7),
-                v2.RandomVerticalFlip(p=0.7),
-                v2.ToImage(),
-                v2.ToDtype(torch.float32, scale=True),
-                v2.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.247, 0.243, 0.261])
+                transforms.RandomHorizontalFlip(),
+                transforms.RandomResizedCrop((32, 32), scale=(0.8, 1.0), ratio=(0.9, 1.1)),
+                transforms.Resize(224, interpolation=InterpolationMode.BICUBIC),
+                transforms.ToTensor(),
+                transforms.Normalize([0.49139968, 0.48215841, 0.44653091], [0.24703223, 0.24348513, 0.26158784]),
             ]
         )
 
-        self.val_transform = v2.Compose(
+        self.val_transform = transforms.Compose(
             [
-                v2.ToImage(),
-                v2.ToDtype(torch.float32, scale=True),
-                v2.Normalize(mean=[0.4914, 0.4822, 0.4465], std=[0.247, 0.243, 0.261])
+                transforms.Resize(224, interpolation=InterpolationMode.BICUBIC),
+                transforms.ToTensor(),
+                transforms.Normalize([0.49139968, 0.48215841, 0.44653091], [0.24703223, 0.24348513, 0.26158784]),
             ]
-            
         )
         
     def setup(self, stage: str) -> None:
@@ -59,7 +77,7 @@ class CIFARDataModule(L.LightningDataModule):
     def val_dataloader(self) -> EVAL_DATALOADERS:
         return DataLoader(
             dataset=self.val_dataset,
-            batch_size=1.5 * self.opt.batch_size,
+            batch_size=int(1.5*self.opt.batch_size),
             shuffle=False,
             num_workers=self.opt.workers,
             persistent_workers=True,
