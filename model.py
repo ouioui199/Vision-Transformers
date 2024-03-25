@@ -1,9 +1,10 @@
 from argparse import Namespace
-from typing import Dict, Union
+from typing import Dict, Union, Tuple, Optional
 import lightning as L
 
 import torch
 from torch import nn
+from torch import Tensor
 from torch.nn import CrossEntropyLoss
 from torch.optim import Adam, AdamW
 from torch.optim.lr_scheduler import LambdaLR, ReduceLROnPlateau
@@ -11,6 +12,7 @@ from torch.optim.lr_scheduler import LambdaLR, ReduceLROnPlateau
 from torchmetrics.classification import Accuracy
 
 from data import im_to_patch
+
 
 class AttentionBlock(nn.Module):
     def __init__(self, embed_dim, hidden_dim, num_heads, dropout: float = 0.0) -> None:
@@ -26,7 +28,7 @@ class AttentionBlock(nn.Module):
             nn.Dropout(dropout)
         )
         
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         inp_x = self.layer_norm(x)
         x += self.attn(inp_x, inp_x, inp_x)[0]
         x += self.linear(self.layer_norm(x))
@@ -37,14 +39,14 @@ class AttentionBlock(nn.Module):
 class VisionTranformer(nn.Module):
     def __init__(
         self,
-        embed_dim,
-        hidden_dim,
+        embed_dim: int,
+        hidden_dim: int,
         num_channels: int,
-        num_heads,
-        num_layers,
-        num_classes,
-        patch_size,
-        num_patches,
+        num_heads: int,
+        num_layers: int,
+        num_classes: int,
+        patch_size: int,
+        num_patches: int,
         dropout: float = 0.0
         ) -> None:
         
@@ -69,7 +71,7 @@ class VisionTranformer(nn.Module):
         self.cls_token = nn.Parameter(torch.rand(1, 1, embed_dim))
         self.pos_embedding = nn.Parameter(torch.rand(1, 1 + num_patches, embed_dim))
         
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         x = im_to_patch(x, self.patch_size)
         B, T, _ = x.shape
         x = self.input_layer(x)
@@ -87,12 +89,13 @@ class VisionTranformer(nn.Module):
         
         
 class ViT(L.LightningModule):
-    def __init__(self, opt: Namespace, model_kwargs, lr) -> None:
+    def __init__(self, opt: Namespace, model_kwargs: Optional[Dict]) -> None:
         super().__init__()
         
         self.save_hyperparameters()
         
         self.opt = opt
+        self.lr = opt.start_lr
         self.model = VisionTranformer(**model_kwargs)
         self.loss = CrossEntropyLoss()
         self.accuracy = Accuracy(task='multiclass', num_classes=10)
@@ -100,11 +103,11 @@ class ViT(L.LightningModule):
         self.train_step_outputs = {}
         self.valid_step_outputs = {}
         
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: Tensor) -> Tensor:
         return self.model(x)
     
     def configure_optimizers(self) -> Dict[str, Union[torch.optim.Optimizer, torch.optim.lr_scheduler.LRScheduler]]:
-        optimizer = AdamW(params=self.parameters(), lr=self.hparams.lr)
+        optimizer = AdamW(params=self.parameters(), lr=self.lr)
         optim_dict = {'optimizer': optimizer}
         if self.opt.lr_plateau:
             optim_dict['lr_scheduler'] = {
@@ -123,7 +126,7 @@ class ViT(L.LightningModule):
             
         return optim_dict
     
-    def _calculate_loss(self, batch: torch.Tensor):
+    def _calculate_loss(self, batch: Tensor) -> Tuple[Tensor]:
         ims, labels = batch
         preds = self(ims)
         
@@ -132,11 +135,11 @@ class ViT(L.LightningModule):
         
         return loss, acc
     
-    def training_step(self, batch: torch.Tensor, batch_idx: int):
+    def training_step(self, batch: Tensor, batch_idx: int) -> Dict[str, Tensor]:
         train_out = self._calculate_loss(batch)
         return {'loss': train_out[0], 'metrics': train_out[1]}
     
-    def on_train_batch_end(self, outputs: Dict[str, torch.Tensor], batch: torch.Tensor, batch_idx: int) -> None:
+    def on_train_batch_end(self, outputs: Dict[str, Tensor], batch: Tensor, batch_idx: int) -> None:
         self.log('step_loss', outputs['loss'], prog_bar=True)
         self.log('step_metrics', outputs['metrics'])
         
@@ -157,11 +160,11 @@ class ViT(L.LightningModule):
         
         self.loggers[0].log_metrics(_log_dict, self.current_epoch)
         
-    def validation_step(self, batch: torch.Tensor, batch_idx: int):
+    def validation_step(self, batch: Tensor, batch_idx: int) -> Dict[str, Tensor]:
         valid_out = self._calculate_loss(batch)
         return {'val_loss': valid_out[0], 'metrics': valid_out[1]}
         
-    def on_validation_batch_end(self, outputs: Dict[str, torch.Tensor], batch: torch.Tensor, batch_idx: int, dataloader_idx: int = 0) -> None:
+    def on_validation_batch_end(self, outputs: Dict[str, Tensor], batch: Tensor, batch_idx: int, dataloader_idx: int = 0) -> None:
         self.log('step_val_loss', outputs['val_loss'], prog_bar=True)
         self.log('step_val_metrics', outputs['metrics'])
         
