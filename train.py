@@ -8,7 +8,7 @@ from lightning.pytorch.tuner import Tuner
 from lightning.pytorch.callbacks import EarlyStopping, LearningRateMonitor, ModelCheckpoint
 
 from data import CIFARDataModule
-from model import BaseViT, ViT
+from model import BaseViT, ViT, HybridTransformer
 from utils import argparser, CustomProgressBar, TBLogger
 
 # set_float32_matmul_precision('high')
