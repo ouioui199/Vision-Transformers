@@ -1,3 +1,5 @@
 *.ipynb
 .vscode
 __pycache__
+
+training_logs
