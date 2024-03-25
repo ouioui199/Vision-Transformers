@@ -210,3 +210,20 @@ class ViT(BaseViT):
         
     def forward(self, x):
         return self.model(x)
+    
+
+class HybridTransformer(BaseViT):
+    
+    def __init__(self, opt: Namespace, model_kwargs: Optional[Dict]) -> None:
+        super().__init__(opt, model_kwargs)
+        
+        self.model = timm.create_model(
+            'efficientformerv2_s2.snap_dist_in1k', 
+            # pretrained=True, 
+            in_chans=self.opt.in_channels,
+            img_size=self.opt.model_input_size,
+            num_classes=10
+        )
+        
+    def forward(self, x: Tensor) -> Tensor:
+        return self.model(x)
