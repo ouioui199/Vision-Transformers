@@ -14,12 +14,37 @@ from torchmetrics.classification import Accuracy
 from data import im_to_patch
 
 
-class AttentionBlock(nn.Module):
-    def __init__(self, embed_dim, hidden_dim, num_heads, dropout: float = 0.0) -> None:
+class Attention(nn.Module):
+    def __init__(self, embed_dim: int, num_heads: int) -> None:
         super().__init__()
         
-        self.layer_norm = nn.LayerNorm(embed_dim)
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.q_norm = nn.LayerNorm(self.head_dim)
+        self.k_norm = nn.LayerNorm(self.head_dim)
+        self.qkv = nn.Linear(embed_dim, embed_dim * 3)
         self.attn = nn.MultiheadAttention(embed_dim, num_heads)
+        
+    def forward(self, x: Tensor) -> Tensor:
+        B, N, _ = x.shape
+        qkv = self.qkv(x).reshape(B, N, 3, -1).permute(2, 0, 1, 3)
+        q, k, v = qkv.unbind(0)
+        q, k = self.q_norm(q), self.k_norm(k)
+        return self.attn(q, k, v)[0]
+
+
+class Block(nn.Module):
+    def __init__(
+        self, 
+        embed_dim: int, 
+        hidden_dim: int,
+        num_heads: int,
+        dropout: float = 0.0
+    ) -> None:
+        super().__init__()
+        
+        self.attn_out = Attention(embed_dim, num_heads)
+        self.layer_norm = nn.LayerNorm(embed_dim)
         self.linear = nn.Sequential(
             nn.Linear(embed_dim, hidden_dim),
             nn.GELU(),
@@ -28,10 +53,14 @@ class AttentionBlock(nn.Module):
             nn.Dropout(dropout)
         )
         
+        
     def forward(self, x: Tensor) -> Tensor:
-        inp_x = self.layer_norm(x)
-        x = x + self.attn(inp_x, inp_x, inp_x)[0]
+        x = self.layer_norm(x)
+        x = x + self.attn_out(x)
         x = x + self.linear(self.layer_norm(x))
+        # inp_x = self.layer_norm(x)
+        # x = x + self.attn(inp_x, inp_x, inp_x)[0]
+        # x = x + self.linear(self.layer_norm(x))
         
         return x
     
@@ -56,7 +85,7 @@ class VisionTranformer(nn.Module):
         
         self.input_layer = nn.Linear(num_channels * (patch_size ** 2), embed_dim)
         self.transformer = nn.Sequential(
-            *(AttentionBlock(
+            *(Block(
                 embed_dim,
                 hidden_dim, 
                 num_heads,
@@ -79,13 +108,13 @@ class VisionTranformer(nn.Module):
         
         cls_token = self.cls_token.repeat(B, 1, 1)
         x = torch.cat([cls_token, x], dim=1)
-        x = x + self.pos_embedding[:, :T+1]
+        x = x + self.pos_embedding
         
         x = self.dropout(x)
         x = x.transpose(0, 1)
         x = self.transformer(x)
         
-        cls = x[0]
+        cls = x[0] # position of cls_token
         return self.mlp_head(cls)
         
         
