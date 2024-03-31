@@ -16,17 +16,17 @@ from utils import argparser, CustomProgressBar, TBLogger
 def launch_training(opt: Namespace) -> None:
     data_module = CIFARDataModule(opt)
     model_kwargs = {
-        "embed_dim": 256,
-        "hidden_dim": 512,
-        "num_heads": 8,
-        "num_layers": 6,
-        "patch_size": 4,
-        "num_channels": opt.in_channels,
-        "num_patches": 64,
-        "num_classes": 10,
+        "embed_dim": 256, #embedded dim of the transformer model
+        "hidden_dim": 512, #hidden dim of mlp layer in attention block
+        "num_heads": 8, #number of self attention head
+        "num_layers": 6, #number of attention layers
+        "patch_size": 4, #size of an image patch after splitting
+        "num_channels": opt.in_channels, #number of input image channel
+        "num_patches": 64, #number of patches splitted from image
+        "num_classes": 10, #number of class for the classification task
         "dropout": 0.2,
     }
-    network = ViT(opt, model_kwargs)
+    network = BaseViT(opt, model_kwargs)
 
     trainer = Trainer(
         max_epochs=opt.epochs,
