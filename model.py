@@ -20,6 +20,7 @@ class Attention(nn.Module):
         
         self.num_heads = num_heads
         self.head_dim = embed_dim // num_heads
+        self.scale = self.head_dim ** - 0.5
         self.q_norm = nn.LayerNorm(self.head_dim)
         self.k_norm = nn.LayerNorm(self.head_dim)
         self.qkv = nn.Linear(embed_dim, embed_dim * 3)
@@ -27,10 +28,15 @@ class Attention(nn.Module):
         
     def forward(self, x: Tensor) -> Tensor:
         B, N, _ = x.shape
-        qkv = self.qkv(x).reshape(B, N, 3, -1).permute(2, 0, 1, 3)
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, self.head_dim).permute(2, 0, 3, 1, 4)
         q, k, v = qkv.unbind(0)
         q, k = self.q_norm(q), self.k_norm(k)
-        return self.attn(q, k, v)[0]
+        return self.scaled_dot_product_attention(q, k, v)
+    
+    def scaled_dot_product_attention(self, q: Tensor, k: Tensor, v: Tensor) -> Tensor:
+        q = q * self.scale
+        out = (q @ k.transpose(-2, -1)).softmax(dim=-1)
+        return out @ v
 
 
 class Block(nn.Module):
@@ -43,7 +49,7 @@ class Block(nn.Module):
     ) -> None:
         super().__init__()
         
-        self.attn_out = Attention(embed_dim, num_heads)
+        self.attn = Attention(embed_dim, num_heads)
         self.layer_norm = nn.LayerNorm(embed_dim)
         self.linear = nn.Sequential(
             nn.Linear(embed_dim, hidden_dim),
@@ -53,10 +59,11 @@ class Block(nn.Module):
             nn.Dropout(dropout)
         )
         
-        
     def forward(self, x: Tensor) -> Tensor:
-        x = self.layer_norm(x)
-        x = x + self.attn_out(x)
+        # x = self.layer_norm(x)
+        B, N, C = x.shape
+        attn = self.attn(x).transpose(1, 2).reshape(B, N, C)
+        x = x + attn
         x = x + self.linear(self.layer_norm(x))
         # inp_x = self.layer_norm(x)
         # x = x + self.attn(inp_x, inp_x, inp_x)[0]
@@ -111,10 +118,10 @@ class VisionTranformer(nn.Module):
         x = x + self.pos_embedding
         
         x = self.dropout(x)
-        x = x.transpose(0, 1)
+        # x = x.transpose(0, 1)
         x = self.transformer(x)
         
-        cls = x[0] # position of cls_token
+        cls = x[:, 0] # position of cls_token
         return self.mlp_head(cls)
         
         
